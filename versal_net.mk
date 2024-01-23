@@ -21,6 +21,8 @@ BR2_PACKAGE_OPENSSH_KEY_UTILS ?= y
 # Openssl binary
 BR2_PACKAGE_LIBOPENSSL_BIN ?= y
 
+BR2_TARGET_GENERIC_GETTY_PORT ?= ttyAMA1
+
 PLATFORM = versal-net-vnx-b2197-revA
 OPTEE_OS_PLATFORM = versal-adaptative
 OPTEE_OS_COMMON_EXTRA_FLAGS = CFG_PKCS11_TA=y CFG_USER_TA_TARGET_pkcs11=ta_arm64 O=out/arm
@@ -49,13 +51,24 @@ include toolchain.mk
 ################################################################################
 
 TF_A_EXPORTS = CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
-TF_A_FLAGS = PLAT=versal_net VERSAL_NET_CONSOLE=pl011 RESET_TO_BL31=1 SPD=opteed DEBUG=1
+TF_A_FLAGS = PLAT=versal_net VERSAL_NET_CONSOLE=pl011 RESET_TO_BL31=1 SPD=opteed DEBUG=1 \
+	     VERSAL_NET_ATF_MEM_BASE=0x0C000000 VERSAL_NET_ATF_MEM_SIZE=0x100000
 
-tfa:
+tfa: tfa-patched
 	$(TF_A_EXPORTS) $(MAKE) -C $(TF_A_PATH) $(TF_A_FLAGS) bl31
 
-tfa-clean:
+tfa-clean: tfa-patched-clean
 	$(TF_A_EXPORTS) $(MAKE) -C $(TF_A_PATH) $(TF_A_FLAGS) clean
+
+tfa-patched:
+	cd $(TF_A_PATH) && \
+		git rev-parse --short HEAD > tfa-commit-id && \
+		git am $(CURDIR)/versal/patches/versal_net/*.patch
+	mv $(TF_A_PATH)/tfa-commit-id tfa-patched
+
+tfa-patched-clean:
+	cd $(TF_A_PATH) && git reset --hard $$(cat $(CURDIR)/tfa-patched)
+	rm -f tfa-patched
 
 ################################################################################
 # OP-TEE
@@ -71,7 +84,7 @@ optee-os-clean: optee-os-clean-common
 ################################################################################
 
 U-BOOT_EXPORTS = CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
-U-BOOT_CONFIG = xilinx_versal_net_virt_defconfig
+U-BOOT_CONFIG = xilinx_versal_net_vnx_defconfig
 U-BOOT_DTS = versal-net-vn-x-b2197-00-revA
 
 u-boot:
@@ -116,7 +129,7 @@ LINUX_CLEANER_COMMON_FLAGS += ARCH=arm64
 linux-cleaner: linux-cleaner-common
 
 ###############################################################################
-# Bouildroot
+# Buildroot
 ###############################################################################
 
 BR2_TARGET_GENERIC_ISSUE="OP-TEE embedded distrib for $(PLATFORM)"
@@ -138,17 +151,17 @@ BR2_PACKAGE_OPTEE_BENCHMARK=n
 ###############################################################################
 # Images
 ###############################################################################
-image: bootimage fitimage
-image-clean: bootimage-clean fitimage-clean
+image: bootimage
+image-clean: bootimage-clean
 
 ###############################################################################
 # Boot Image
 ###############################################################################
 
-bootimage: bootgen tfa optee-os u-boot
-	$(BOOTGEN_PATH)/bootgen -arch versal -image versal/bootImage-${PLATFORM}.bif -w -o versal/BOOT.BIN
+bootimage: bootgen tfa optee-os u-boot linux dtbo fitimage
+	$(BOOTGEN_PATH)/bootgen -arch versalnet -image versal/bootImage-${PLATFORM}.bif -w -o versal/BOOT.BIN
 
-bootimage-clean: bootgen-clean tfa-clean optee-os-clean u-boot-clean
+bootimage-clean: bootgen-clean tfa-clean optee-os-clean u-boot-clean linux-clean dtbo-clean fitimage-clean
 	rm -f versal/BOOT.BIN
 
 
@@ -167,9 +180,9 @@ bootgen-clean:
 # FIT Image
 ###############################################################################
 
-fitimage: linux dtbo buildroot
+fitimage: buildroot
 	${U-BOOT_PATH}/tools/mkimage -f versal/fitImage-${PLATFORM}.its versal/${PLATFORM}.ub
 
-fitimage-clean: linux-clean dtbo-clean buildroot-clean
+fitimage-clean: buildroot-clean
 	rm -f versal/${PLATFORM}.ub
 

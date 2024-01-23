@@ -1,0 +1,36 @@
+From dd54125f17ea10920eda1c4a5f13f1693dcaab25 Mon Sep 17 00:00:00 2001
+From: Nathan Menhorn <nathan.menhorn@amd.com>
+Date: Mon, 15 Jan 2024 08:36:52 -0800
+Subject: [PATCH 1/2] Fixed opteed_fast error
+
+This patch resolves the opteed_fast error that is seen when using the
+standard build with the flag SPD=opteed. This standard build is causing errors
+to not load, in this case, OP-TEE.
+---
+ plat/xilinx/versal_net/bl31_versal_net_setup.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/plat/xilinx/versal_net/bl31_versal_net_setup.c b/plat/xilinx/versal_net/bl31_versal_net_setup.c
+index d2b6c7bc0..f606fd68b 100644
+--- a/plat/xilinx/versal_net/bl31_versal_net_setup.c
++++ b/plat/xilinx/versal_net/bl31_versal_net_setup.c
+@@ -53,7 +53,7 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
+  */
+ static inline void bl31_set_default_config(void)
+ {
+-	bl32_image_ep_info.pc = BL32_BASE;
++	bl32_image_ep_info.pc = 0x22200000uL;//BL32_BASE;
+ 	bl32_image_ep_info.spsr = arm_get_spsr_for_bl32_entry();
+ 	bl33_image_ep_info.pc = plat_get_ns_image_entrypoint();
+ 	bl33_image_ep_info.spsr = SPSR_64(MODE_EL2, MODE_SP_ELX,
+@@ -160,6 +160,7 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
+ 		}
+ 
+ 		INFO("BL31: PLM to TF-A handover success\n");
++      bl31_set_default_config();
+ 	} else {
+ 		INFO("BL31: setting up default configs\n");
+ 
+-- 
+2.34.1
+
