@@ -84,15 +84,27 @@ optee-os-clean: optee-os-clean-common
 ################################################################################
 
 U-BOOT_EXPORTS = CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
-U-BOOT_CONFIG = xilinx_versal_net_vnx_defconfig
 U-BOOT_DTS = versal-net-vn-x-b2197-00-revA
+U-BOOT_DEFCONFIG_COMMON_FILES = \
+	$(UBOOT_PATH)/configs/xilinx_versal_net_vnx_defconfig \
+	$(CURDIR)/kconfigs/versal.conf
 
-u-boot:
-	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) $(U-BOOT_CONFIG)
+$(UBOOT_PATH)/.config: $(U-BOOT_CONFIG_COMMON_FILES)
+	cd $(UBOOT_PATH) && \
+		$(U-BOOT_EXPORTS) \
+		scripts/kconfig/merge_config.sh $(U-BOOT_DEFCONFIG_COMMON_FILES)
+
+u-boot: u-boot-defconfig
 	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) DEVICE_TREE=$(U-BOOT_DTS) DTC_FLAGS="-@"
 
-u-boot-clean:
+u-boot-clean: u-boot-defconfig-clean
 	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) clean
+
+u-boot-defconfig: $(UBOOT_PATH)/.config
+
+.PHONY: u-boot-defconfig-clean
+u-boot-defconfig-clean:
+	rm -f $(UBOOT_PATH)/.config
 
 ###############################################################################
 # Device-Tree
