@@ -1,7 +1,7 @@
 the_ROM_image:
 {
 	image {
-	      { type=bootimage, file=../versal-net-bsp/ksb-hw-patched-raw_20231113_115133.pdi }
+	      { type=bootimage, file=../versal-net-bsp/ksb-hw-optee-20240125.pdi }
 	}
 
 	image {
